@@ -80,7 +80,7 @@ for (const mode of ["auto", "legacy"]) {
           client.getServerVersion().version,
           require("../package.json").version,
         );
-        assert.equal((await client.listTools()).tools.length, 16);
+        assert.equal((await client.listTools()).tools.length, 29);
         const result = await client.callTool({
           name: "GetProgram",
           arguments: { program_name: "ZFIXTURE", startLine: 2, maxLines: 1 },

@@ -23,7 +23,20 @@ describe('paging tool schemas', () => {
     'GetCDSView',
     'GetInterface',
     'GetBehaviorDefinition',
-    'GetServiceDefinition'
+    'GetServiceDefinition',
+    'RunSelect',
+    'GetSystemInfo',
+    'ListDumps',
+    'GetDump',
+    'GetWhereUsed',
+    'GetVersionHistory',
+    'GetVersionSource',
+    'CompareVersions',
+    'GetMessageText',
+    'GetDomainValues',
+    'RunAtcCheck',
+    'ListTraces',
+    'GetTraceDetails'
   ];
 
   it('declares the exact textual tool set protected by paging', () => {

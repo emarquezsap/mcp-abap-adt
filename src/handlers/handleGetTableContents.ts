@@ -1,5 +1,6 @@
 import { McpError, ErrorCode } from '../lib/utils';
-import { makeAdtRequest, return_error, return_response, getBaseUrl } from '../lib/utils';
+import { return_error, return_response, return_text_response } from '../lib/utils';
+import { assertTablesAllowed, runFreestyle, compactOrRaw } from '../lib/sql';
 
 // Plain DDIC names, including namespaces like /NS/TAB
 const NAME_RE = /^[A-Z0-9_/]+$/;
@@ -64,16 +65,12 @@ export async function handleGetTableContents(args: any) {
             throw new McpError(ErrorCode.InvalidParams, 'Table name is required');
         }
         const query = buildTableQuery(args);
+        assertTablesAllowed(query);
         const maxRows = args.max_rows || 100;
-        const url = `${await getBaseUrl()}/sap/bc/adt/datapreview/freestyle`;
-        const response = await makeAdtRequest(
-            url,
-            'POST',
-            30000,
-            query,
-            { rowNumber: maxRows },
-            { 'Content-Type': 'text/plain', 'Accept': 'application/xml, text/plain, */*' }
-        );
+        const response = await runFreestyle(query, maxRows);
+        if (args.format !== 'xml') {
+            return return_text_response(compactOrRaw(response.data), args);
+        }
         return return_response(response, args);
     } catch (error) {
         return return_error(error);

@@ -76,7 +76,7 @@ async function stdioSmoke(entry, cwd) {
         );
       }
       const catalog = await request("tools/list");
-      assert.equal(catalog.result.tools.length, 16);
+      assert.equal(catalog.result.tools.length, 29);
       for (const tool of catalog.result.tools) {
         assert.equal(tool.annotations.readOnlyHint, true);
         assert.equal(tool.inputSchema.properties.startLine.type, "integer");
