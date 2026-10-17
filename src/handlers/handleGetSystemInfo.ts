@@ -46,9 +46,18 @@ export async function handleGetSystemInfo(args: any) {
         const sysinfo = await tryGet('/sap/bc/adt/system/information', 'application/json, application/xml, */*');
         if (sysinfo) {
             try {
-                info.systemInformation = sysinfo.trim().startsWith('{')
-                    ? JSON.parse(sysinfo)
-                    : simplify(parseXml(sysinfo));
+                if (sysinfo.trim().startsWith('{')) {
+                    info.systemInformation = JSON.parse(sysinfo);
+                } else {
+                    // Atom feed of id/title pairs -> { id: title }
+                    const entries = asArray(child(parseXml(sysinfo), 'feed', 'entry'));
+                    const map: Record<string, string> = {};
+                    for (const e of entries) {
+                        const id = text(e.id);
+                        if (id && !id.startsWith('NotAuthorized')) map[id] = text(e.title);
+                    }
+                    info.systemInformation = Object.keys(map).length ? map : simplify(parseXml(sysinfo));
+                }
             } catch {
                 /* ignore unknown formats */
             }

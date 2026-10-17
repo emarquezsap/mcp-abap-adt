@@ -154,9 +154,10 @@ describe('3. dumps', () => {
   <atom:category term="CONVT_NO_NUMBER" label="ABAP runtime error"/>
   <atom:category term="ZPROGRAM" label="Terminated ABAP program"/>
   <atom:id>x1</atom:id>
-  <atom:link href="/sap/bc/adt/runtime/dump/20261015%20E_USER%2001" rel="self" type="text/plain"/>
+  <atom:link href="adt://DEV/sap/bc/adt/vit/runtime/dumps/20261015%20E_USER%2001" rel="alternate"/>
+  <atom:link href="adt://DEV/sap/bc/adt/runtime/dump/20261015%20E_USER%2001" rel="self" type="text/plain"/>
   <atom:published>2026-10-15T10:00:00Z</atom:published>
-  <atom:summary type="html">&lt;table&gt;&lt;tr&gt;&lt;td&gt;Short Text&lt;/td&gt;&lt;td&gt;Unable to interpret "A" as a number.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;Exception&lt;/td&gt;&lt;td&gt;CX_SY_CONVERSION_NO_NUMBER&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;h3&gt;What happened?&lt;/h3&gt;&lt;p&gt;Error in the ABAP application program.&lt;/p&gt;</atom:summary>
+  <atom:summary type="html">&lt;h4 id="HEADERX"&gt;Header Information&lt;/h4&gt;&lt;table&gt;&lt;tr&gt;&lt;td&gt;&lt;b&gt;Short Text&amp;nbsp;&lt;/b&gt;&lt;/td&gt;&lt;td&gt; Unable to interpret "A" as a number. &lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;&lt;b&gt;Exception&amp;nbsp;&lt;/b&gt;&lt;/td&gt;&lt;td&gt;CX_SY_CONVERSION_NO_NUMBER&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;h4 id="WHATHAPPENED"&gt;What happened?&lt;/h4&gt;Error in the ABAP&lt;br&gt;application program.&lt;h4 id="TERMINATION"&gt;Information on where terminated&lt;/h4&gt;Line 5 of include "ZPROGRAM".&lt;h4 id="SOURCE"&gt;Source Code Extract&lt;/h4&gt;&lt;table&gt;&lt;tr&gt;&lt;td&gt;&lt;div class="sourceline"&gt;&lt;span&gt;DATA n TYPE i.&lt;/span&gt;&lt;/div&gt;&lt;div class="sourceline highlight"&gt;&lt;span&gt;n = 'A'.&lt;/span&gt;&lt;/div&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;h4 id="STACK"&gt;Active Calls/Events&lt;/h4&gt;&lt;table&gt;&lt;tr&gt;&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Event&lt;/th&gt;&lt;th&gt;Program&lt;/th&gt;&lt;th&gt;Include&lt;/th&gt;&lt;th&gt;Line&lt;/th&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;1&lt;/td&gt;&lt;td&gt;START-OF-SELECTION&lt;/td&gt;&lt;td&gt;ZPROGRAM&lt;/td&gt;&lt;td&gt;ZPROGRAM&lt;/td&gt;&lt;td&gt;5&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;</atom:summary>
   <atom:title>Runtime error CONVT_NO_NUMBER</atom:title></atom:entry>
   <atom:entry><atom:author><atom:name>OTHER</atom:name></atom:author><atom:link href="/sap/bc/adt/runtime/dump/old" rel="self"/><atom:published>2026-09-01T10:00:00Z</atom:published><atom:title>old</atom:title></atom:entry></atom:feed>`;
 
@@ -174,7 +175,10 @@ describe('3. dumps', () => {
     expect(d.user).toBe('E_USER');
     expect(d.categories).toEqual({ 'ABAP runtime error': 'CONVT_NO_NUMBER', 'Terminated ABAP program': 'ZPROGRAM' });
     expect(d.header).toEqual({ 'Short Text': 'Unable to interpret "A" as a number.', Exception: 'CX_SY_CONVERSION_NO_NUMBER' });
-    expect(d.summary).toContain('What happened?');
+    expect(d.whatHappened).toBe('Error in the ABAP\napplication program.');
+    expect(d.whereTerminated).toBe('Line 5 of include "ZPROGRAM".');
+    expect(d.sourceExtract).toBe("   DATA n TYPE i.\n>> n = 'A'.");
+    expect(d.activeCalls).toEqual(['1 START-OF-SELECTION ZPROGRAM:5']);
     expect(summaryHeader('<p>no table</p>')).toEqual({});
   });
 
@@ -189,6 +193,7 @@ describe('3. dumps', () => {
 
   it('validates dump and trace ids', () => {
     expect(checkDumpId('/sap/bc/adt/runtime/dump/abc%20d')).toBe('abc%20d');
+    expect(checkDumpId('adt://AEQ/sap/bc/adt/runtime/dump/abc%20d')).toBe('abc%20d');
     expect(() => checkDumpId('../../x')).toThrow('dump_id');
     expect(() => checkDumpId('a?b=c')).toThrow('dump_id');
     expect(checkTraceId('/sap/bc/adt/runtime/traces/abaptraces/AB12')).toBe('AB12');
@@ -215,6 +220,8 @@ describe('5. where used', () => {
     const r: any = await handleGetWhereUsed({ object_type: 'TABL', object_name: 'ZTAB', only_custom: true });
     expect(request.mock.calls[0][4]).toEqual({ uri: '/sap/bc/adt/ddic/tables/ztab' });
     expect(JSON.parse(r.content[0].text).results.map((u: any) => u.object)).toEqual(['ZCL_A']);
+    const self: any = await handleGetWhereUsed({ object_type: 'CLAS', object_name: 'ZCL_A' });
+    expect(JSON.parse(self.content[0].text).results.map((u: any) => u.object)).toEqual(['RSTD']);
   });
 });
 
@@ -237,6 +244,8 @@ describe('6. versions', () => {
     expect(parseVersionFeed(xml)).toEqual([
       {
         index: 0,
+        version: '00002',
+        state: 'stored',
         date: '2026-10-01T12:00:00Z',
         author: 'DEV1',
         transport: 'DEVK900123',
@@ -260,6 +269,7 @@ describe('6. versions', () => {
     expect(r.removed).toBe(1);
     expect(r.diff).toBe(['--- old', '+++ new', '@@ -2,4 +2,5 @@', ' b', '-c', '+X', ' d', ' e', '+f'].join('\n'));
     expect(unifiedDiff('same', 'same', 'o', 'n')!.diff).toBe('');
+    expect(unifiedDiff('METHOD a.\n  x = 1.', 'method A.\n    X = 1.', 'o', 'n', 3, true)!.diff).toBe('');
   });
 });
 

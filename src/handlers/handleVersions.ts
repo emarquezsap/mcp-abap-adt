@@ -9,13 +9,17 @@ export function parseVersionFeed(xml: string) {
         const links = asArray(e.link).map(attrs);
         const transport =
             links.find((l) => (l.type || '').includes('transportrequests'))?.name || links.find((l) => l.name)?.name || '';
+        const uri = attrs(e.content).src || '';
+        const version = /\/versions\/[^/]+\/([^/]+)\/content$/.exec(uri)?.[1] || '';
         return {
             index,
+            version,
+            state: version && /^0+$/.test(version) ? 'active/current (not a stored version)' : 'stored',
             date: text(e.updated),
             author: text(child(e, 'author', 'name')),
             transport,
             title: text(e.title),
-            uri: attrs(e.content).src || '',
+            uri,
         };
     });
 }
@@ -64,8 +68,9 @@ export async function handleCompareVersions(args: any) {
         const toUri = args?.to_version_uri ? checkVersionUri(args.to_version_uri) : undefined;
         if (!fromUri) {
             // newest entry first in the ADT feed; when diffing two stored versions use the one after "to"
-            const idx = toUri ? list.findIndex((v) => v.uri === toUri) + 1 : 0;
-            fromUri = list[idx]?.uri;
+            const stored = list.filter((v) => v.state === 'stored');
+            const idx = toUri ? stored.findIndex((v) => v.uri === toUri) + 1 : 0;
+            fromUri = stored[idx]?.uri;
             if (!fromUri) {
                 throw new McpError(ErrorCode.InvalidParams, 'No earlier version found to compare with');
             }
@@ -75,7 +80,7 @@ export async function handleCompareVersions(args: any) {
         const lf = label(fromUri);
         const oldLabel = `${fromUri} (${lf.date} ${lf.author} ${lf.transport})`.trim();
         const newLabel = toUri ? `${toUri} (${label(toUri).date} ${label(toUri).author} ${label(toUri).transport})` : `${src} (active)`;
-        const result = unifiedDiff(oldText, newText, oldLabel, newLabel, Number(args?.context_lines ?? 3));
+        const result = unifiedDiff(oldText, newText, oldLabel, newLabel, Number(args?.context_lines ?? 3), !!args?.ignore_case_and_spaces);
         if (!result) {
             return return_text_response('The versions differ too much for an inline diff; use GetVersionSource with paging instead.', args);
         }

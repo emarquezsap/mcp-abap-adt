@@ -59,7 +59,10 @@ export async function handleGetWhereUsed(args: any) {
             { 'Content-Type': 'application/*', Accept: 'application/*' },
         );
         const { usages, containers } = parseUsageReferences(String(response.data));
-        const filter = args?.only_custom ? usages.filter((u) => /^[ZY]|^\/(?!SAP|1)/i.test(u.object)) : usages;
+        const self = String(args.object_name).toUpperCase();
+        // the object's own components (e.g. method definitions of a class) are not "users"
+        let filter = args?.include_self ? usages : usages.filter((u) => u.object.toUpperCase() !== self);
+        if (args?.only_custom) filter = filter.filter((u) => /^[ZY]|^\/(?!SAP|1)/i.test(u.object));
         return return_text_response(
             jsonLines(
                 { object: uri, usages: filter.length, containers, returned: Math.min(filter.length, max) },

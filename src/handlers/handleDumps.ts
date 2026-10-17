@@ -36,25 +36,65 @@ export function buildDumpQuery(args: any): string | undefined {
     return parts.length ? `and ( ${parts.join(' , ')} )` : undefined;
 }
 
-/** Key/value rows of the header table inside the HTML summary of a dump entry. */
+/** Key/value rows of the first (header) table inside the HTML summary of a dump entry. */
 export function summaryHeader(html: string): Record<string, string> {
     const header: Record<string, string> = {};
+    const table = /<table[^>]*>([\s\S]*?)<\/table>/i.exec(html)?.[1] ?? '';
     const rowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
     let m: RegExpExecArray | null;
-    while ((m = rowRe.exec(html))) {
+    while ((m = rowRe.exec(table))) {
         const cells = [...m[1].matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)].map((c) => htmlToText(c[1]));
-        if (cells.length >= 2 && cells[0] && cells[0].length < 60 && !(cells[0] in header)) {
-            header[cells[0].replace(/:$/, '')] = cells.slice(1).join(' ').trim();
+        if (cells.length >= 2 && cells[0] && !(cells[0] in header)) {
+            header[cells[0].replace(/:$/, '').trim()] = cells.slice(1).join(' ').trim();
         }
     }
     return header;
+}
+
+const SECTIONS: Record<string, string> = {
+    WHATHAPPENED: 'whatHappened',
+    ERROR: 'errorAnalysis',
+    TERMINATION: 'whereTerminated',
+    SOURCE: 'sourceExtract',
+    STACK: 'activeCalls',
+};
+
+/** Text of the summary sections (split by their <h4 id=...> anchors). */
+export function summarySections(html: string): Record<string, any> {
+    const out: Record<string, any> = {};
+    const parts = html.split(/<h4[^>]*id="([A-Z]+)"[^>]*>[\s\S]*?<\/h4>/i);
+    for (let i = 1; i < parts.length; i += 2) {
+        const key = SECTIONS[parts[i].toUpperCase()];
+        if (!key) continue;
+        const body = parts[i + 1] || '';
+        if (key === 'activeCalls') {
+            out[key] = [...body.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)]
+                .map((r) => [...r[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map((c) => htmlToText(c[1])))
+                .filter((c) => c.length >= 5)
+                .map((c) => `${c[0]} ${c[1]} ${c[3]}:${c[4]}`);
+        } else if (key === 'sourceExtract') {
+            const lines = [...body.matchAll(/<div[^>]*class="sourceline( highlight)?"[^>]*>([\s\S]*?)<\/div>/gi)].map(
+                (d) => (d[1] ? '>> ' : '   ') + htmlToText(d[2]).replace(/\u00a0/g, ' '),
+            );
+            out[key] = lines.length ? lines.join('\n') : htmlToText(body);
+        } else {
+            out[key] = htmlToText(body);
+        }
+    }
+    return out;
+}
+
+/** "adt://SID/sap/bc/adt/runtime/dump/<id>" or "/sap/bc/adt/runtime/dump/<id>" -> "<id>" */
+export function dumpIdFromHref(href: string): string | undefined {
+    const i = href.indexOf(DUMP_PREFIX);
+    return i >= 0 ? href.slice(i + DUMP_PREFIX.length) : undefined;
 }
 
 export function parseDumpFeed(xml: string, includeDetails = false) {
     const feed = child(parseXml(xml), 'feed');
     return asArray(feed?.entry).map((e: any) => {
         const links = asArray(e.link).map(attrs);
-        const self = links.find((l) => l.rel === 'self') || links.find((l) => (l.href || '').includes(DUMP_PREFIX));
+        const self = links.find((l) => l.rel === 'self' && dumpIdFromHref(l.href || '')) || links.find((l) => dumpIdFromHref(l.href || ''));
         const categories: Record<string, string> = {};
         for (const c of asArray(e.category).map(attrs)) {
             if (c.label && c.term) categories[c.label] = c.term;
@@ -62,14 +102,14 @@ export function parseDumpFeed(xml: string, includeDetails = false) {
         const summaryHtml = text(e.summary);
         const header = summaryHeader(summaryHtml);
         const item: Record<string, any> = {
-            id: self?.href ? self.href.replace(DUMP_PREFIX, '') : text(e.id),
+            id: (self && dumpIdFromHref(self.href)) || text(e.id),
             datetime: text(e.published) || text(e.updated),
             user: text(child(e, 'author', 'name')),
             title: text(e.title),
             categories,
             header,
         };
-        if (includeDetails) item.summary = htmlToText(summaryHtml).slice(0, 6000);
+        if (includeDetails) Object.assign(item, summarySections(summaryHtml));
         return item;
     });
 }
@@ -105,7 +145,7 @@ export async function handleListDumps(args: any) {
 
 export function checkDumpId(value: unknown): string {
     let id = String(value ?? '').trim();
-    if (id.startsWith(DUMP_PREFIX)) id = id.slice(DUMP_PREFIX.length);
+    id = dumpIdFromHref(id) ?? id;
     if (!/^[A-Za-z0-9%._\-~]{1,400}$/.test(id)) invalid('dump_id must be an id returned by ListDumps');
     return id;
 }

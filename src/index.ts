@@ -563,6 +563,10 @@ const EXTRA_TOOLS = [
       type: "object",
       properties: {
         ...OBJECT_ARGS,
+        include_self: {
+          type: "boolean",
+          description: "Also list the object's own components",
+        },
         only_custom: {
           type: "boolean",
           description: "Only Z*/Y*/customer namespace users",
@@ -617,6 +621,11 @@ const EXTRA_TOOLS = [
         to_version_uri: {
           type: "string",
           description: "Newer version (default active source)",
+        },
+        ignore_case_and_spaces: {
+          type: "boolean",
+          description:
+            "Ignore upper/lower case and whitespace differences (pretty printer changes)",
         },
         context_lines: {
           type: "integer",
