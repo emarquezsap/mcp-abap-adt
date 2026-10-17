@@ -307,14 +307,68 @@ export function return_response(
   return return_text_response(response.data, args);
 }
 
+const HTTP_HINTS: Record<number, string> = {
+  400: "SAP rejected the request (check names, syntax and parameters)",
+  401: "authentication failed (check SAP_USERNAME, SAP_PASSWORD, SAP_CLIENT; repeated failures can lock the user)",
+  403: "missing authorization (check SU53 / STAUTHTRACE for the technical user)",
+  404: "object or service not found (check the name or that /sap/bc/adt is active in SICF)",
+  423: "object is locked (see SM12)",
+  500: "internal SAP error (check ST22 / SM21)",
+};
+
+function decodeXmlText(text: string): string {
+  return text
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Extract only the human readable message of an ADT exception document
+ * (<exc:exception> ... <message>/<localizedMessage> ...). Any other body
+ * (HTML login pages, plain text, source code) is ignored on purpose.
+ */
+export function extractAdtErrorMessage(data: unknown): string | undefined {
+  let body: string;
+  if (typeof data === "string") body = data;
+  else if (Buffer.isBuffer(data)) body = data.toString("utf8");
+  else return undefined;
+  if (body.length > 200_000 || !/<(\w+:)?exception[\s>]/.test(body)) {
+    return undefined;
+  }
+  const pick = (tag: string) => {
+    const m = body.match(
+      new RegExp(`<(?:\\w+:)?${tag}\\b[^>]*>([\\s\\S]*?)</(?:\\w+:)?${tag}>`),
+    );
+    return m ? decodeXmlText(m[1]) : "";
+  };
+  const text = pick("localizedMessage") || pick("message");
+  if (!text) return undefined;
+  const typeMatch = body.match(/<(?:\w+:)?type\b[^>]*\bid="([^"]{1,100})"/);
+  const type = typeMatch ? ` [${typeMatch[1]}]` : "";
+  return `${text.slice(0, 500)}${type}`;
+}
+
 export function return_error(error: any) {
-  // Upstream bodies may contain source, login pages, cookies or credentials.
+  // Upstream bodies may contain source, login pages, cookies or credentials:
+  // only the message of a structured ADT exception document is surfaced.
+  const httpMessage = (status: number, data: unknown) => {
+    const detail = extractAdtErrorMessage(data);
+    const hint = HTTP_HINTS[status];
+    return `SAP request failed (HTTP ${status})${detail ? `: ${detail}` : ""}${hint ? ` — ${hint}` : ""}`;
+  };
   const message =
     error instanceof AxiosError
       ? error.code === "ERR_CANCELED"
         ? "SAP request cancelled"
         : error.response
-          ? `SAP request failed (HTTP ${error.response.status})`
+          ? httpMessage(error.response.status, error.response.data)
           : "SAP connection failed; verify SAP_URL, certificate trust and network access"
       : error instanceof McpError
         ? error.message
