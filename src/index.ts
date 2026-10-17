@@ -202,13 +202,29 @@ const TOOL_DEFINITIONS = [
   {
     name: "GetTableContents",
     description:
-      "Retrieve contents of an ABAP table. max_rows limits SAP rows; startLine/maxLines page the returned textual XML when its serialized size is still large.",
+      "Retrieve contents of an ABAP table or view (read-only ADT data preview). Optional fields, where and order_by build an ABAP SQL SELECT, e.g. where: \"BUKRS = '1000' AND GJAHR = '2026'\". Use ABAP SQL syntax with literals in single quotes and internal formats (leading zeros, YYYYMMDD dates). max_rows limits SAP rows; startLine/maxLines page the returned textual XML when its serialized size is still large.",
     inputSchema: {
       type: "object",
       properties: {
         table_name: {
           type: "string",
           description: "Name of the ABAP table",
+        },
+        fields: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Optional columns to return (default all), e.g. [\"BUKRS\", \"BELNR\", \"GJAHR\"]",
+        },
+        where: {
+          type: "string",
+          description:
+            "Optional ABAP SQL condition without the WHERE keyword, e.g. MATNR = '000000000000001234' AND WERKS LIKE 'C%'",
+        },
+        order_by: {
+          type: "string",
+          description:
+            "Optional ORDER BY list, e.g. \"ERDAT DESCENDING, VBELN\"",
         },
         max_rows: {
           type: "number",
