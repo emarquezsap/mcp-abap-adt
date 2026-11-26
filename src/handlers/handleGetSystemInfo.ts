@@ -37,7 +37,11 @@ export async function handleGetSystemInfo(args: any) {
     try {
         const config = getConfig();
         const info: Record<string, any> = {
-            host: new URL(config.url).host,
+            connection: config.connection,
+            host:
+                config.connection === 'rfc'
+                    ? `${config.rfc?.ashost || config.rfc?.mshost}${config.rfc?.saprouter ? ` via SAProuter ${config.rfc.saprouter}` : ''}`
+                    : new URL(config.url).host,
             client: config.client,
             user: config.username,
             language: config.language || '(user default)',

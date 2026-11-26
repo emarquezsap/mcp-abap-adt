@@ -31,3 +31,24 @@ Besides the existing ADT read role, the new tools may need:
 - Traces: `S_ADMI_FCD` (`ST0M`/`ST0R`) and `S_DEVELOP` display.
 
 A 403 answer names SU53 / STAUTHTRACE in the error message.
+
+## Connection over SAProuter (ADT over RFC)
+
+When a system is reachable only through a SAProuter (no VPN), set `SAP_CONNECTION=rfc`.
+Every ADT request is sent through the standard function module `SADT_REST_RFC_ENDPOINT`
+(function group `SADT_REST`), the same transport Eclipse ADT uses for RFC connections,
+so all tools keep working.
+
+Requirements: SAP NW RFC SDK (`SAPNWRFC_HOME`, its `lib` folder in `PATH`), the optional
+package `node-rfc` (installed by `npm install`), the SAProuter must permit the gateway
+port 33NN (48NN with SNC) and the user needs `S_RFC` for function group `SADT_REST`.
+
+| Variable | Meaning |
+| --- | --- |
+| `SAP_CONNECTION` | `http` (default, uses `SAP_URL`) or `rfc` |
+| `SAP_ROUTER` | SAProuter string, e.g. `/H/router.client.com/S/3299` |
+| `SAP_ASHOST` + `SAP_SYSNR` | Application server and instance number |
+| `SAP_MSHOST` + `SAP_SYSID` + `SAP_GROUP` (+ `SAP_MSSERV`) | Logon group instead of a fixed server |
+| `SAP_RFC_<PARAM>` | Any other node-rfc parameter, e.g. `SAP_RFC_SNC_MODE=1` |
+
+`SAP_USERNAME`, `SAP_PASSWORD`, `SAP_CLIENT` and `SAP_LANGUAGE` work as in HTTP mode.

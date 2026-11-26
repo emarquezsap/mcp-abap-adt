@@ -11,6 +11,7 @@ import {
 } from "./network";
 import { AxiosResponse } from "axios";
 import { getConfig, SapConfig } from "../config";
+import { rfcAdtRequest, closeRfc } from "./rfc";
 
 export { McpError, ErrorCode };
 export type { AxiosResponse };
@@ -373,7 +374,7 @@ export function return_error(error: any) {
       : error instanceof McpError
         ? error.message
         : error instanceof Error &&
-            /^(Missing required environment variables|SAP_URL must|TLS_REJECT_UNAUTHORIZED must|SAP_CA_FILE must|SAP_LANGUAGE must|SAP request target must|Invalid SAP request target|CSRF token is required)/.test(
+            /^(Missing required environment variables|SAP RFC connection failed|SAP_CONNECTION|SAP_SYSNR|SAP_MSHOST|SAP_ROUTER|SAP_CLIENT must|SAP_URL must|TLS_REJECT_UNAUTHORIZED must|SAP_CA_FILE must|SAP_LANGUAGE must|SAP request target must|Invalid SAP request target|CSRF token is required)/.test(
               error.message,
             )
           ? error.message
@@ -401,6 +402,7 @@ export function createAxiosInstance() {
 }
 
 export function cleanup() {
+  void closeRfc();
   axiosInstance?.defaults.httpsAgent?.destroy();
   axiosInstance = null;
   config = undefined;
@@ -512,6 +514,19 @@ export async function makeAdtRequest(
   }
 
   assertSapTarget(url, config);
+
+  if (config.connection === "rfc") {
+    // No CSRF/cookies over RFC: the logon is the RFC connection itself.
+    return (await rfcAdtRequest(
+      config,
+      url,
+      method,
+      timeout,
+      data,
+      params,
+      headers,
+    )) as any;
+  }
 
   // For POST/PUT requests, ensure we have a CSRF token
   if ((method === "POST" || method === "PUT") && !csrfToken) {

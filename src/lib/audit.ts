@@ -35,7 +35,12 @@ export function sanitizeArgs(args: unknown): Record<string, unknown> {
 function connection(env = process.env) {
   let host = "";
   try {
-    host = env.SAP_URL ? new URL(env.SAP_URL).host : "";
+    host =
+      (env.SAP_CONNECTION || "").toLowerCase() === "rfc"
+        ? `rfc:${env.SAP_ASHOST || env.SAP_MSHOST || ""}`
+        : env.SAP_URL
+          ? new URL(env.SAP_URL).host
+          : "";
   } catch {
     host = "";
   }
