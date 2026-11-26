@@ -115,6 +115,16 @@ describe('ADT over RFC', () => {
     expect(calls).toHaveLength(1); // no CSRF round trip over RFC
   });
 
+  it('adds the default Accept header like axios does over HTTP', async () => {
+    rfcEnv();
+    nextResponse = { STATUS_LINE: { STATUS_CODE: '200' }, HEADER_FIELDS: [], MESSAGE_BODY: Buffer.from('REPORT x.') };
+    const base = await utilsModule.getBaseUrl();
+    await utilsModule.makeAdtRequest(`${base}/sap/bc/adt/programs/programs/x/source/main`, 'GET', 30000);
+    expect(calls[0].args.REQUEST.HEADER_FIELDS).toEqual([
+      { NAME: 'Accept', VALUE: 'application/json, text/plain, */*' },
+    ]);
+  });
+
   it('turns ADT error status into the usual readable error', async () => {
     rfcEnv();
     nextResponse = {

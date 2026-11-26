@@ -98,9 +98,14 @@ export async function rfcAdtRequest(
   params?: Record<string, unknown>,
   headers?: Record<string, unknown>,
 ) {
+  // Over HTTP axios always sends an Accept header; ADT rejects requests without one.
+  const merged: Record<string, unknown> = { ...(headers || {}) };
+  if (!Object.keys(merged).some((k) => k.toLowerCase() === "accept")) {
+    merged.Accept = "application/json, text/plain, */*";
+  }
   const request = {
     REQUEST_LINE: { METHOD: method.toUpperCase(), URI: buildRfcUri(url, params), VERSION: "HTTP/1.1" },
-    HEADER_FIELDS: Object.entries(headers || {})
+    HEADER_FIELDS: Object.entries(merged)
       .filter(([k, v]) => v !== undefined && v !== null && !/^(authorization|cookie|x-csrf-token|x-sap-client)$/i.test(k))
       .map(([NAME, VALUE]) => ({ NAME, VALUE: String(VALUE) })),
     MESSAGE_BODY: toBody(data),
